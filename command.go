@@ -130,7 +130,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/joho/godotenv"
+	// "github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
@@ -227,6 +227,7 @@ func main() {
 		bot.Send(tgbotapi.NewMessage(chatID, "✅ Admin mode active."))
 	}
 }
+
 
 
 
