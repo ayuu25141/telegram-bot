@@ -137,10 +137,10 @@ import (
 
 func main() {
 	// Load environment variables (.env)
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("❌ Error loading .env file")
-	}
+	// err := godotenv.Load()
+	// if err != nil {
+	// 	log.Fatal("❌ Error loading .env file")
+	// }
 
 	// Connect to PostgreSQL
 	dbURL := os.Getenv("DB_URL")
@@ -227,6 +227,7 @@ func main() {
 		bot.Send(tgbotapi.NewMessage(chatID, "✅ Admin mode active."))
 	}
 }
+
 
 
 
