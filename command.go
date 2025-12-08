@@ -41,12 +41,9 @@ func main() {
 	log.Printf("🤖 Bot @%s Webhook Mode Started", bot.Self.UserName)
 
 	// Set webhook
-	webhookURL := strings.TrimSpace("https://telegram-bot-kzen.onrender.com/webhook")
-webhookConfig := tgbotapi.NewWebhook(webhookURL)
+webhookURL := strings.TrimSpace("https://telegram-bot-kzen.onrender.com/webhook")
+webhookConfig, _ := tgbotapi.NewWebhook(webhookURL)
 _, err = bot.Request(webhookConfig)
-if err != nil {
-    log.Fatal("❌ Failed to set webhook:", err)
-}
 
 	// Webhook handler
 	http.HandleFunc("/webhook", HandleWebhook)
@@ -111,4 +108,5 @@ func HandleWebhook(w http.ResponseWriter, r *http.Request) {
 	// Admin default response
 	bot.Send(tgbotapi.NewMessage(chatID, "✅ Admin mode active."))
 }
+
 
