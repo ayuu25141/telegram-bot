@@ -118,105 +118,117 @@
 // 		bot.Send(tgbotapi.NewMessage(chatID, "✅ Admin mode active. You can upload videos with captions to name them."))
 // 	}
 // }
-
-
 package main
 
 import (
-	"database/sql"
-	"encoding/json"
-	"fmt"
-	"log"
-	"net/http"
-	"os"
-	"strings"
+    "database/sql"
+    "encoding/json"
+    "fmt"
+    "log"
+    "net/http"
+    "os"
+    "strings"
 
-	_ "github.com/lib/pq"
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+    _ "github.com/lib/pq"
+    tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
 var bot *tgbotapi.BotAPI
 var db *sql.DB
 
 func main() {
-	var err error
+    var err error
 
-	// Connect to PostgreSQL
-	dbURL := os.Getenv("DB_URL")
-	db, err = sql.Open("postgres", dbURL)
-	if err != nil {
-		log.Fatal("❌ Failed to connect DB:", err)
-	}
-	defer db.Close()
+    // Connect to PostgreSQL
+    dbURL := os.Getenv("DB_URL")
+    db, err = sql.Open("postgres", dbURL)
+    if err != nil {
+        log.Fatal("❌ Failed to connect DB:", err)
+    }
+    defer db.Close()
 
-	if err = db.Ping(); err != nil {
-		log.Fatal("❌ DB unreachable:", err)
-	}
-	fmt.Println("✅ Connected to PostgreSQL")
+    if err = db.Ping(); err != nil {
+        log.Fatal("❌ DB unreachable:", err)
+    }
+    fmt.Println("✅ Connected to PostgreSQL")
 
-	// Setup Bot
-	botToken := os.Getenv("Bt")
-	bot, err = tgbotapi.NewBotAPI(botToken)
-	if err != nil {
-		log.Fatal("❌ Bot init failed:", err)
-	}
-	log.Printf("🤖 Bot @%s Webhook Mode Started", bot.Self.UserName)
+    // Setup Bot
+    botToken := os.Getenv("BT") // ensure key is BT (uppercase)
+    bot, err = tgbotapi.NewBotAPI(botToken)
+    if err != nil {
+        log.Fatal("❌ Bot init failed:", err)
+    }
+    log.Printf("🤖 Bot @%s Webhook Mode Started", bot.Self.UserName)
 
-	// Webhook handler
-	http.HandleFunc("/webhook", HandleWebhook)
+    // Set webhook
+    webhookURL := "https://telegram-bot-kzen.onrender.com/webhook"
 
-	// Listen on Render required port
-	port := os.Getenv("PORT")
-	log.Println("🚀 Server running on port", port)
-	log.Fatal(http.ListenAndServe(":"+port, nil))
+    _, err = bot.Request(tgbotapi.NewWebhook(webhookURL))
+    if err != nil {
+        log.Fatal("❌ Failed to set webhook:", err)
+    }
+    log.Println("🌐 Webhook set to:", webhookURL)
+
+    // Webhook handler
+    http.HandleFunc("/webhook", HandleWebhook)
+
+    // Render auto provides PORT
+    port := os.Getenv("PORT")
+    if port == "" {
+        port = "10000" // fallback
+    }
+
+    log.Println("🚀 Server running on port", port)
+    log.Fatal(http.ListenAndServe(":"+port, nil))
 }
 
 func HandleWebhook(w http.ResponseWriter, r *http.Request) {
-	var update tgbotapi.Update
-	if err := json.NewDecoder(r.Body).Decode(&update); err != nil {
-		log.Println("Invalid update:", err)
-		return
-	}
+    var update tgbotapi.Update
+    if err := json.NewDecoder(r.Body).Decode(&update); err != nil {
+        log.Println("Invalid update:", err)
+        return
+    }
 
-	if update.Message == nil {
-		return
-	}
+    if update.Message == nil {
+        return
+    }
 
-	chatID := update.Message.Chat.ID
-	text := update.Message.Text
-	adminID := int64(6386418509)
+    chatID := update.Message.Chat.ID
+    text := update.Message.Text
+    adminID := int64(6386418509)
 
-	// Handle /start <deeplinkid>
-	if strings.HasPrefix(text, "/start") {
-		payload := strings.TrimSpace(strings.TrimPrefix(text, "/start"))
+    // Handle /start <deeplink>
+    if strings.HasPrefix(text, "/start") {
+        payload := strings.TrimSpace(strings.TrimPrefix(text, "/start"))
 
-		if payload == "" {
-			msg := "👋 Welcome! Use a valid video link."
-			if chatID == adminID {
-				msg = "👋 Welcome Admin! Upload videos freely."
-			}
-			bot.Send(tgbotapi.NewMessage(chatID, msg))
-			return
-		}
+        if payload == "" {
+            msg := "👋 Welcome! Use a valid video link."
+            if chatID == adminID {
+                msg = "👋 Welcome Admin! Upload videos freely."
+            }
+            bot.Send(tgbotapi.NewMessage(chatID, msg))
+            return
+        }
 
-		var videourl string
-		err := db.QueryRow(`SELECT videourl FROM videodata WHERE deeplinkid=$1`, payload).Scan(&videourl)
-		if err != nil {
-			bot.Send(tgbotapi.NewMessage(chatID, "❌ Invalid or expired video link."))
-			return
-		}
+        var videourl string
+        err := db.QueryRow(`SELECT videourl FROM videodata WHERE deeplinkid=$1`, payload).Scan(&videourl)
+        if err != nil {
+            bot.Send(tgbotapi.NewMessage(chatID, "❌ Invalid or expired video link."))
+            return
+        }
 
-		video := tgbotapi.NewVideo(chatID, tgbotapi.FileID(videourl))
-		video.Caption = "🎬 Here’s your video!"
-		bot.Send(video)
-		return
-	}
+        video := tgbotapi.NewVideo(chatID, tgbotapi.FileID(videourl))
+        video.Caption = "🎬 Here’s your video!"
+        bot.Send(video)
+        return
+    }
 
-	// Non-admin users restricted
-	if chatID != adminID {
-		bot.Send(tgbotapi.NewMessage(chatID, "💡 Use a valid bot link to access your video."))
-		return
-	}
+    // Restrict normal users
+    if chatID != adminID {
+        bot.Send(tgbotapi.NewMessage(chatID, "💡 Use a valid bot link to access your video."))
+        return
+    }
 
-	bot.Send(tgbotapi.NewMessage(chatID, "✅ Admin mode active."))
+    // Admin default response
+    bot.Send(tgbotapi.NewMessage(chatID, "✅ Admin mode active."))
 }
